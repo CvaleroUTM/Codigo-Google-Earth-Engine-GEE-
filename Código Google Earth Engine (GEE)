@@ -1,0 +1,89 @@
+// Definir las coordenadas en latitud y longitud para la región de interés
+var coords = [
+  [-79.068624, -2.427778],
+  [-79.107397, -2.279828],
+  [-79.181751, -2.210664],
+  [-79.525188, -2.281757],
+  [-79.843829, -2.368757],
+  [-80.258624, -2.100202],
+  [-80.442856, -1.926624],
+  [-80.513117, -1.922231],
+  [-80.574289, -1.817324],
+  [-80.528215, -1.766075],
+  [-80.567952, -1.639437],
+  [-80.552917, -1.518293],
+  [-80.487242, -1.328309],
+  [-80.257175, -1.292100],
+  [-80.238096, -1.169561],
+  [-80.155708, -1.130868],
+  [-80.000439, -1.056245],
+  [-79.883285, -0.896968],
+  [-79.967367, -0.532829],
+  [-79.965633, -0.248408],
+  [-79.707475, -0.320508],
+  [-79.459176, -0.273367],
+  [-79.176155, -0.239083],
+  [-79.083542, -0.303221],
+  [-79.062512, -0.452462],
+  [-78.980074, -0.550706],
+  [-78.947631, -0.768581],
+  [-78.944154, -0.950596],
+  [-78.848633, -1.106239],
+  [-78.802650, -1.127807],
+  [-78.949600, -1.332224],
+  [-78.862352, -1.547752],
+  [-78.857459, -1.998901],
+  [-78.650011, -2.102912],
+  [-78.646485, -2.312893],
+  [-78.795294, -2.352740],
+  [-78.963856, -2.438192],
+  [-79.068624, -2.427778] // Repetir la primera coordenada para cerrar el polígono
+];
+
+// Crear un polígono con las coordenadas
+var roi = ee.Geometry.Polygon([coords]);
+
+// Centrar el mapa en el polígono
+Map.centerObject(roi, 9);
+
+// Cargar la colección de imágenes de radar Sentinel-1 (desde 2014 hasta la fecha actual)
+var sentinel1 = ee.ImageCollection('COPERNICUS/S1_GRD')
+  .filterBounds(roi)
+  .filterDate('2014-01-01', ee.Date(Date.now()))
+  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+  .select('VV');
+
+// Calcular la mediana de las imágenes de radar
+var radarImage = sentinel1.median().clip(roi);
+
+// Visualizar la imagen de radar
+Map.addLayer(radarImage, {min: -25, max: 0, palette: ['black', 'white']}, 'Radar Image');
+
+// Cargar la capa de ríos utilizando HydroSHEDS
+var rivers = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
+  .filterBounds(roi);
+
+// Estilo para los ríos
+var riverStyle = {
+  color: 'blue',
+  width: 2
+};
+
+// Visualizar los ríos en el mapa
+Map.addLayer(rivers.style(riverStyle), {}, 'Ríos');
+
+// Exportar la imagen de radar a Google Drive
+Export.image.toDrive({
+  image: radarImage,
+  description: 'RadarImage_AllYears',
+  scale: 10, // Ajustar la escala según sea necesario
+  region: roi,
+  fileFormat: 'GeoTIFF'
+});
+
+// Exportar los vectores de los ríos a Google Drive
+Export.table.toDrive({
+  collection: rivers,
+  description: 'Rivers_GeoJSON',
+  fileFormat: 'GeoJSON'
+});
